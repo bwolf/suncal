@@ -7,13 +7,13 @@ import (
 )
 
 func TestDefault(t *testing.T) {
-	coord := GeoCoord{50.0, 10.0}
-	fmt.Printf("Coordinates %+v\n", coord)
+	coords := GeoCoordinates{50.0, 10.0}
+	fmt.Printf("Coordinates %s\n", coords)
 	rise := time.Date(2005, 9, 30, 7, 18, 0, 0, time.FixedZone("CET", 7200))
 	set := time.Date(2005, 9, 30, 19, 00, 0, 0, time.FixedZone("CET", 7200))
-	date := time.Date(2005, 9, 30, 0, 0, 0, 0, time.FixedZone("CET", 7200))
 
-	sun := SunCal(coord, date)
+	date := time.Date(2005, 9, 30, 0, 0, 0, 0, time.FixedZone("CET", 7200))
+	sun := SunCal(coords, date)
 
 	if !sun.Rise.Equal(rise) {
 		t.Errorf("SunCal failed for rise, got %s, want %s", sun.Rise.String(), rise.String())
@@ -29,12 +29,13 @@ func TestDefault(t *testing.T) {
 }
 
 func TestMunich(t *testing.T) {
-	coord := GeoCoord{49.0, 11.0}
-	fmt.Printf("Coordinates %+v\n", coord)
-	rise := time.Date(2005, 11, 18, 7, 29, 0, 0, time.FixedZone("CET", 3600))
-	set := time.Date(2005, 11, 18, 16, 31, 0, 0, time.FixedZone("CET", 3600))
-	date := time.Date(2005, 11, 18, 0, 0, 0, 0, time.FixedZone("CET", 3600))
-	sun := SunCal(coord, date)
+	coords := GeoCoordinates{48.137222, 11.575556} // Munich, Germany
+	fmt.Printf("Coordinates %s\n", coords)
+	rise := time.Date(2015, 11, 18, 7, 24, 0, 0, time.FixedZone("CET", 3600))
+	set := time.Date(2015, 11, 18, 16, 32, 0, 0, time.FixedZone("CET", 3600))
+
+	date := time.Date(2015, 11, 18, 0, 0, 0, 0, time.FixedZone("CET", 3600))
+	sun := SunCal(coords, date)
 
 	if !sun.Rise.Equal(rise) {
 		t.Errorf("SunCal failed for rise, got %s, want %s", sun.Rise.String(), rise.String())

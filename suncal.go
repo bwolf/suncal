@@ -1,34 +1,34 @@
-// TODO does this and that, see from http://lexikon.astronomie.info/zeitgleichung/
-// TODO minute precission, simple compared to other calculations
+/* Package suncal calculates the rise and the set of the sun with about minute accuracy.
+
+   The calculations are based on the ideas at http://lexikon.astronomie.info/zeitgleichung/.
+*/
 
 package suncal
 
 import (
+	"fmt"
 	. "math"
 	"time"
 )
 
 const (
-	TwilightDefault    Twilight = -50.0
-	TwilightCivil      Twilight = -6.0
-	TwilightAstronomic Twilight = -18.0
-	TwilightNautic     Twilight = -12.0
 	// Private constants
 	pi2    = 2 * Pi
 	jd2000 = 2451545.0
-	rad    = 0.017453292519943295769236907684886 // TODO replace with to_radians'!
 )
-
-type Twilight float64
 
 type SunInfo struct {
 	Rise time.Time
 	Set  time.Time
 }
 
-type GeoCoord struct {
-	Lat float64 // Latitude, geographische Breite
-	Lon float64 // Longitude, geographische Laenge
+type GeoCoordinates struct {
+	Latitude  float64
+	Longitude float64
+}
+
+func (c GeoCoordinates) String() string {
+	return fmt.Sprintf("Latitude: %v Longitude %v", c.Latitude, c.Longitude)
 }
 
 func mkJulianDate(date time.Time) float64 {
@@ -63,7 +63,7 @@ func inPi(x float64) float64 {
 
 // Tilt of the earth axis
 func eps(t float64) float64 {
-	return rad * (23.43929111 + (-46.8150*t-0.00059*t*t+0.001813*t*t*t)/3600.0)
+	return Pi / 180 * (23.43929111 + (-46.8150*t-0.00059*t*t+0.001813*t*t*t)/3600.0)
 }
 
 // https://en.wikipedia.org/wiki/Equation_of_time
@@ -133,19 +133,15 @@ func applyTimezone(worldTime float64, date time.Time) float64 {
 }
 
 // Calculate sunrise and sunset for given coordinates and date for the default twilight.
-func SunCal(coord GeoCoord, date time.Time) SunInfo {
-	return SunCalTwilight(coord, TwilightDefault, date)
-}
-
-// Calculate sunrise and sunset for given coordinates and date with given twilight.
-func SunCalTwilight(coord GeoCoord, twilightKind Twilight, date time.Time) SunInfo {
+func SunCal(coords GeoCoordinates, date time.Time) SunInfo {
 	jd := mkJulianDate(date)
 
 	t := (jd - jd2000) / 36525.0
 	// default -50, civil -6, astronomic -18, nautic -12 arcs
-	h := float64(twilightKind) / 60.0 * rad
-	lat := coord.Lat * rad
-	lon := coord.Lon
+	// h := float64(twilightKind) / 60.0 * Pi / 180
+	h := -50.0 / 60.0 * Pi / 180
+	lat := coords.Latitude * Pi / 180
+	lon := coords.Longitude
 
 	timeEqu, dk := calcTimeEquation(t)
 	timeDiff := 12.0 * Acos((Sin(h)-Sin(lat)*Sin(dk))/(Cos(lat)*Cos(dk))) / Pi
