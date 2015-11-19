@@ -1,31 +1,50 @@
 package suncal
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+	"time"
+)
 
 func TestDefault(t *testing.T) {
-	rise := &DumbTime{7, 18}
-	set := &DumbTime{19, 00}
-	sun := SunCalc(GeoCoord{50.0, 10.0}, MySummerTime, 2005, 9, 30)
+	coord := GeoCoord{50.0, 10.0}
+	fmt.Printf("Coordinates %+v\n", coord)
+	rise := time.Date(2005, 9, 30, 7, 18, 0, 0, time.FixedZone("CET", 7200))
+	set := time.Date(2005, 9, 30, 19, 00, 0, 0, time.FixedZone("CET", 7200))
+	date := time.Date(2005, 9, 30, 0, 0, 0, 0, time.FixedZone("CET", 7200))
 
-	if !sun.rise.Eq(rise) {
-		t.Errorf("SunCal failed for rise, got %s, want %s", sun.rise.String(), rise.String())
+	sun := SunCal(coord, date)
+
+	if !sun.Rise.Equal(rise) {
+		t.Errorf("SunCal failed for rise, got %s, want %s", sun.Rise.String(), rise.String())
 	}
 
-	if !sun.set.Eq(set) {
-		t.Errorf("SunCal failed for dawn, got %v, want %q", sun.set.String(), set.String())
+	if !sun.Set.Equal(set) {
+		t.Errorf("SunCal failed for dawn, got %v, want %q", sun.Set.String(), set.String())
 	}
+
+	fmt.Printf("Date %d-%02d-%02d\n", date.Year(), date.Month(), date.Day())
+	fmt.Printf("Rise %02d:%02d\n", sun.Rise.Hour(), sun.Rise.Minute())
+	fmt.Printf("Set  %02d:%02d\n", sun.Set.Hour(), sun.Set.Minute())
 }
 
 func TestMunich(t *testing.T) {
-	sun := SunCalc(GeoCoord{49.0, 11.0}, MyNormalTime, 2015, 11, 18)
+	coord := GeoCoord{49.0, 11.0}
+	fmt.Printf("Coordinates %+v\n", coord)
+	rise := time.Date(2005, 11, 18, 7, 29, 0, 0, time.FixedZone("CET", 3600))
+	set := time.Date(2005, 11, 18, 16, 31, 0, 0, time.FixedZone("CET", 3600))
+	date := time.Date(2005, 11, 18, 0, 0, 0, 0, time.FixedZone("CET", 3600))
+	sun := SunCal(coord, date)
 
-	expectedRise := DumbTime{7, 29}
-	if !sun.rise.Eq(&expectedRise) {
-		t.Errorf("SunCal failed for rise, got %s, want %s", sun.rise.String(), expectedRise.String())
+	if !sun.Rise.Equal(rise) {
+		t.Errorf("SunCal failed for rise, got %s, want %s", sun.Rise.String(), rise.String())
 	}
 
-	expectedSet := DumbTime{16, 31}
-	if !sun.set.Eq(&expectedSet) {
-		t.Errorf("SunCal failed for dawn, got %v, want %q", sun.set.String(), expectedSet.String())
+	if !sun.Set.Equal(set) {
+		t.Errorf("SunCal failed for dawn, got %v, want %q", sun.Set.String(), set.String())
 	}
+
+	fmt.Printf("Date %d-%02d-%02d\n", date.Year(), date.Month(), date.Day())
+	fmt.Printf("Rise %02d:%02d\n", sun.Rise.Hour(), sun.Rise.Minute())
+	fmt.Printf("Set  %02d:%02d\n", sun.Set.Hour(), sun.Set.Minute())
 }
