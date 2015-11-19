@@ -15,12 +15,16 @@ type DumbTime struct {
 	hour, minute int
 }
 
-func (dtl *DumbTime) Eq(dtr *DumbTime) bool {
-	return dtl.hour == dtr.hour && dtl.minute == dtr.minute
+func NewDumbTime(time float64) DumbTime {
+	return floatTimeToDumbTime(time)
+}
+
+func (lhs *DumbTime) Eq(rhs *DumbTime) bool {
+	return lhs.hour == rhs.hour && lhs.minute == rhs.minute
 }
 
 func (dt *DumbTime) String() string {
-	return fmt.Sprintf("%d:%02d", dt.hour, dt.minute) // TODO 00:00
+	return fmt.Sprintf("%02d:%02d", dt.hour, dt.minute) // TODO 00:00
 }
 
 type SunInfo struct {
@@ -77,19 +81,13 @@ func eps(t float64) float64 {
 	return rad * (23.43929111 + (-46.8150*t-0.00059*t*t+0.001813*t*t*t)/3600.0)
 }
 
-// TODO was ist DK?
-// TODO was ist T?
-// TODO Funktionsname
-// In German: Zeitgleichung
-func berechneZeitgleichung(t float64) (float64, float64) {
-	var raMittel float64 = 18.71506921 + 2400.0513369*t + (2.5862e-5-1.72e-9*t)*t*t
-
-	var m float64 = inPi(pi2 * (0.993133 + 99.997361*t))
-	var l float64 = inPi(pi2 * (0.7859453 + m/pi2 +
-		(6893.0*Sin(m)+72.0*Sin(2.0*m)+6191.2*t)/1296.0e3))
-
-	var e float64 = eps(t)
-	var ra float64 = Atan(Tan(l) * Cos(e))
+// https://en.wikipedia.org/wiki/Equation_of_time
+func calcTimeEquation(t float64) (float64, float64) {
+	raMid := 18.71506921 + 2400.0513369*t + (2.5862e-5-1.72e-9*t)*t*t
+	m := inPi(pi2 * (0.993133 + 99.997361*t))
+	l := inPi(pi2 * (0.7859453 + m/pi2 + (6893.0*Sin(m)+72.0*Sin(2.0*m)+6191.2*t)/1296.0e3))
+	e := eps(t)
+	ra := Atan(Tan(l) * Cos(e))
 
 	if ra < 0.0 {
 		ra += Pi
@@ -101,10 +99,10 @@ func berechneZeitgleichung(t float64) (float64, float64) {
 	ra = 24.0 * ra / pi2
 	dk := Asin(Sin(e) * Sin(l))
 
-	// Damit 0 <= RA_Mittel < 24
-	raMittel = 24.0 * inPi(pi2*raMittel/24.0) / pi2
+	// Ensure 0 <= raMid < 24
+	raMid = 24.0 * inPi(pi2*raMid/24.0) / pi2
 
-	var dRA float64 = raMittel - ra
+	dRA := raMid - ra
 	if dRA < -12.0 {
 		dRA += 24.0
 	} else if dRA > 12.0 {
@@ -115,7 +113,7 @@ func berechneZeitgleichung(t float64) (float64, float64) {
 	return dRA, dk
 }
 
-func floatTimeToDumbTime(time float64) *DumbTime {
+func floatTimeToDumbTime(time float64) DumbTime {
 	var minutes int = int(60.0*(time-float64(int(time))) + 0.5)
 
 	var hours int = int(time)
@@ -130,7 +128,7 @@ func floatTimeToDumbTime(time float64) *DumbTime {
 		}
 	}
 
-	return &DumbTime{hours, minutes}
+	return DumbTime{hours, minutes}
 }
 
 // Apply timezone to world time
@@ -158,7 +156,7 @@ func SunCalc(coord GeoCoord, timezone MyTimeZone, year, month, day int) SunInfo 
 	// Zeitzone := float64(timezone) // TODO TZ
 	tz := float64(timezone) // TODO TZ
 
-	timeEqu, dk := berechneZeitgleichung(t) // TODO CalcTimeEquation
+	timeEqu, dk := calcTimeEquation(t)
 	timeDiff := 12.0 * Acos((Sin(h)-Sin(lat)*Sin(dk))/(Cos(lat)*Cos(dk))) / Pi
 	zoneTimeRise := 12.0 - timeDiff - timeEqu
 	zoneTimeDawn := 12.0 + timeDiff - timeEqu
@@ -166,14 +164,14 @@ func SunCalc(coord GeoCoord, timezone MyTimeZone, year, month, day int) SunInfo 
 	worldTimeDawn := zoneTimeDawn - lon/15.0
 	rise := applyTimezone(worldTimeRise, tz)
 	dawn := applyTimezone(worldTimeDawn, tz)
-	dtRise := floatTimeToDumbTime(rise)
-	dtDawn := floatTimeToDumbTime(dawn)
+	dtRise := NewDumbTime(rise)
+	dtDawn := NewDumbTime(dawn)
 
 	// TODO Ausgabe in finaler Version nicht erforderlich
 	fmt.Printf("Aufgang %d:%02d\n", dtRise.hour, dtRise.minute)
 	fmt.Printf("Untergang %d:%02d\n", dtDawn.hour, dtDawn.minute)
 
-	return SunInfo{*dtRise, *dtDawn}
+	return SunInfo{dtRise, dtDawn}
 
 	// Vergleich mit CalSky.com
 	// Aufgang        :  7h18.4m Untergang      : 19h00.6m
