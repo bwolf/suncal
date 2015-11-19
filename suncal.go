@@ -32,7 +32,7 @@ type SunCal struct {
 // Longitude = Geographische Laenge
 
 type GeoCoord struct {
-	lat, long float64
+	lat, lon float64
 }
 
 func MkJulianDate(year, month, day int) float64 {
@@ -67,11 +67,11 @@ func Eps(T float64) float64 {
 	return RAD * (23.43929111 + (-46.8150*T-0.00059*T*T+0.001813*T*T*T)/3600.0)
 }
 
-// TODO gib mehrere Werte zurueck anstelle des pointers
-// TODO was ist DK
-// TODO was ist T
+// TODO was ist DK?
+// TODO was ist T?
 // TODO Funktionsname
-func BerechneZeitgleichung(DK *float64, T float64) float64 {
+// In German: Zeitgleichung
+func BerechneZeitgleichung(T float64) (float64, float64) {
 	var RA_Mittel float64 = 18.71506921 + 2400.0513369*T + (2.5862e-5-1.72e-9*T)*T*T
 
 	var M float64 = inPi(pi2 * (0.993133 + 99.997361*T))
@@ -84,12 +84,13 @@ func BerechneZeitgleichung(DK *float64, T float64) float64 {
 	if RA < 0.0 {
 		RA += Pi
 	}
+
 	if L > Pi {
 		RA += Pi
 	}
 
 	RA = 24.0 * RA / pi2
-	*DK = Asin(Sin(e) * Sin(L))
+	DK := Asin(Sin(e) * Sin(L))
 
 	// Damit 0 <= RA_Mittel < 24
 	RA_Mittel = 24.0 * inPi(pi2*RA_Mittel/24.0) / pi2
@@ -103,7 +104,7 @@ func BerechneZeitgleichung(DK *float64, T float64) float64 {
 	}
 
 	dRA = dRA * 1.0027379
-	return dRA
+	return dRA, DK
 }
 
 type MyTimeZone float64
@@ -114,78 +115,64 @@ const (
 	MySummerTime MyTimeZone = 2.0
 )
 
+func floatTimeToDumbTime(time float64) *DumbTime {
+	var minutes int = int(60.0*(time-float64(int(time))) + 0.5)
+
+	var hours int = int(time)
+	if minutes >= 60.0 {
+		minutes -= 60.0
+		hours++
+	} else if minutes < 0 {
+		minutes += 60.0
+		hours--
+		if hours < 0.0 {
+			hours += 24.0
+		}
+	}
+
+	return &DumbTime{hours, minutes}
+}
+
+// Apply timezone to world time
+func applyTimezone(worldTime, timezone float64) float64 {
+	var t float64 = worldTime + timezone // in hours
+	if t < 0.0 {
+		t += 24.0
+	} else if t >= 24.0 {
+		t -= 24.0
+	}
+	return t
+}
+
 // TODO Zeitzone als Parameter
 func Calc(coord GeoCoord, timezone MyTimeZone, year, month, day int) SunCal {
 	const JD2000 float64 = 2451545.0
-	var JD float64 = MkJulianDate(year, month, day)
+	jd := MkJulianDate(year, month, day)
 
-	var T float64 = (JD - JD2000) / 36525.0
-	const h float64 = -50.0 / 60.0 * RAD
-	var B float64 = coord.lat * RAD // geographische Breite
-	var GeographischeLaenge float64 = coord.long
+	var t float64 = (jd - JD2000) / 36525.0
+	const h float64 = -50.0 / 60.0 * RAD // TODO buergerlich, astronomisch oder militaerisch
+	var lat float64 = coord.lat * RAD
+	var lon float64 = coord.lon
 
-	// const Zeitzone float64 = 0 // Weltzeit
-	// const Zeitzone float64 = 1 // Winterzeit
-	// const Zeitzone float64 = 2.0 // Sommerzeit
-	Zeitzone := float64(timezone)
+	// Zeitzone := float64(timezone) // TODO TZ
+	tz := float64(timezone) // TODO TZ
 
-	var DK float64 = 0
-	var Zeitgleichung float64 = BerechneZeitgleichung(&DK, T)
-
-	var Zeitdifferenz float64 = 12.0 * Acos((Sin(h)-Sin(B)*Sin(DK))/(Cos(B)*Cos(DK))) / Pi
-	var AufgangOrtszeit float64 = 12.0 - Zeitdifferenz - Zeitgleichung
-	var UntergangOrtszeit float64 = 12.0 + Zeitdifferenz - Zeitgleichung
-	var AufgangWeltzeit float64 = AufgangOrtszeit - GeographischeLaenge/15.0
-	var UntergangWeltzeit float64 = UntergangOrtszeit - GeographischeLaenge/15.0
-
-	var Aufgang float64 = AufgangWeltzeit + Zeitzone // In Stunden
-	if Aufgang < 0.0 {
-		Aufgang += 24.0
-	} else if Aufgang >= 24.0 {
-		Aufgang -= 24.0
-	}
-
-	var Untergang float64 = UntergangWeltzeit + Zeitzone
-	if Untergang < 0.0 {
-		Untergang += 24.0
-	} else if Untergang >= 24.0 {
-		Untergang -= 24.0
-	}
-
-	var AufgangMinuten int = int(60.0*(Aufgang-float64(int(Aufgang))) + 0.5)
-	var AufgangStunden int = int(Aufgang)
-	if AufgangMinuten >= 60.0 {
-		AufgangMinuten -= 60.0
-		AufgangStunden++
-	} else if AufgangMinuten < 0.0 {
-		AufgangMinuten += 60.0
-		AufgangStunden--
-		if AufgangStunden < 0.0 {
-			AufgangStunden += 24.0
-		}
-	}
-
-	var UntergangMinuten int = int(60.0*(Untergang-float64(int(Untergang))) + 0.5)
-	var UntergangStunden int = int(Untergang)
-	if UntergangMinuten >= 60.0 {
-		UntergangMinuten -= 60.0
-		UntergangStunden++
-	} else if UntergangMinuten < 0 {
-		UntergangMinuten += 60.0
-		UntergangStunden--
-		if UntergangStunden < 0.0 {
-			UntergangStunden += 24.0
-		}
-	}
+	var timeEqu, DK float64 = BerechneZeitgleichung(t) // TODO CalcTimeEquation
+	var timeDiff float64 = 12.0 * Acos((Sin(h)-Sin(lat)*Sin(DK))/(Cos(lat)*Cos(DK))) / Pi
+	var zoneTimeRise float64 = 12.0 - timeDiff - timeEqu
+	var zoneTimeDawn float64 = 12.0 + timeDiff - timeEqu
+	var worldTimeRise float64 = zoneTimeRise - lon/15.0
+	var worldTimeDawn float64 = zoneTimeDawn - lon/15.0
+	rise := applyTimezone(worldTimeRise, tz)
+	dawn := applyTimezone(worldTimeDawn, tz)
+	dtRise := floatTimeToDumbTime(rise)
+	dtDawn := floatTimeToDumbTime(dawn)
 
 	// TODO Ausgabe in finaler Version nicht erforderlich
-	fmt.Printf("Aufgang %d:%02d\n", AufgangStunden, AufgangMinuten)
-	fmt.Printf("Untergang %d:%02d\n", UntergangStunden, UntergangMinuten)
+	fmt.Printf("Aufgang %d:%02d\n", dtRise.hour, dtRise.minute)
+	fmt.Printf("Untergang %d:%02d\n", dtDawn.hour, dtDawn.minute)
 
-	return SunCal{
-		DumbTime{AufgangStunden, AufgangMinuten},
-		DumbTime{UntergangStunden, UntergangMinuten},
-	}
+	return SunCal{*dtRise, *dtDawn}
 
 	// Vergleich mit CalSky.com
 	// Aufgang        :  7h18.4m Untergang      : 19h00.6m
