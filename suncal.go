@@ -1,6 +1,13 @@
-/* Package suncal calculates the rise and the set of the sun with about minute accuracy.
+/* Package suncal calculates the rise (sunrise) and the set (sunset)
+   of the sun with about minute accuracy.
 
-   The calculations are based on the ideas at http://lexikon.astronomie.info/zeitgleichung/.
+   The calculations are based on the ideas at
+   http://lexikon.astronomie.info/zeitgleichung/ (german).
+
+   Author: M. Geiger
+   License: Apache License Version 2.0, January 2004
+
+   Repo: http://github.com/bwolf/suncal.git
 */
 
 package suncal
