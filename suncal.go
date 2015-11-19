@@ -23,19 +23,29 @@ func (dt *DumbTime) String() string {
 	return fmt.Sprintf("%d:%02d", dt.hour, dt.minute) // TODO 00:00
 }
 
-type SunCal struct {
+type SunInfo struct {
 	rise DumbTime
-	dawn DumbTime
+	set  DumbTime
 }
-
-// Latitude = Geographische Breite
-// Longitude = Geographische Laenge
 
 type GeoCoord struct {
-	lat, lon float64
+	lat float64 // Latitude, geographische Breite
+	lon float64 // Longitude, geographische Laenge
 }
 
-func MkJulianDate(year, month, day int) float64 {
+// TODO replace with go's own timezone if possible or change type to float64 and name it timezone offset
+type MyTimeZone float64
+
+const (
+	MyWorldTime  MyTimeZone = 0.0
+	MyNormalTime MyTimeZone = 1.0
+	MySummerTime MyTimeZone = 2.0
+)
+
+// TODO use go date
+// TODO function name
+// TODO function name indicating float64 result, as special case of julian date in go
+func mkJulianDate(year, month, day int) float64 {
 	const hour = 12.0
 	const minute = 0.0
 	const second = 0.0
@@ -63,7 +73,7 @@ func inPi(x float64) float64 {
 }
 
 // Neigung der Erdachse
-func Eps(t float64) float64 {
+func eps(t float64) float64 {
 	return rad * (23.43929111 + (-46.8150*t-0.00059*t*t+0.001813*t*t*t)/3600.0)
 }
 
@@ -71,14 +81,14 @@ func Eps(t float64) float64 {
 // TODO was ist T?
 // TODO Funktionsname
 // In German: Zeitgleichung
-func BerechneZeitgleichung(t float64) (float64, float64) {
+func berechneZeitgleichung(t float64) (float64, float64) {
 	var raMittel float64 = 18.71506921 + 2400.0513369*t + (2.5862e-5-1.72e-9*t)*t*t
 
 	var m float64 = inPi(pi2 * (0.993133 + 99.997361*t))
 	var l float64 = inPi(pi2 * (0.7859453 + m/pi2 +
 		(6893.0*Sin(m)+72.0*Sin(2.0*m)+6191.2*t)/1296.0e3))
 
-	var e float64 = Eps(t)
+	var e float64 = eps(t)
 	var ra float64 = Atan(Tan(l) * Cos(e))
 
 	if ra < 0.0 {
@@ -105,14 +115,6 @@ func BerechneZeitgleichung(t float64) (float64, float64) {
 	return dRA, dk
 }
 
-type MyTimeZone float64
-
-const (
-	MyWorldTime  MyTimeZone = 0.0
-	MyNormalTime MyTimeZone = 1.0
-	MySummerTime MyTimeZone = 2.0
-)
-
 func floatTimeToDumbTime(time float64) *DumbTime {
 	var minutes int = int(60.0*(time-float64(int(time))) + 0.5)
 
@@ -133,33 +135,35 @@ func floatTimeToDumbTime(time float64) *DumbTime {
 
 // Apply timezone to world time
 func applyTimezone(worldTime, timezone float64) float64 {
-	var t float64 = worldTime + timezone // in hours
-	if t < 0.0 {
-		t += 24.0
+	if t := worldTime + timezone; t < 0.0 {
+		return t + 24.0
 	} else if t >= 24.0 {
-		t -= 24.0
+		return t - 24.0
+	} else {
+		return t
 	}
-	return t
 }
 
-// TODO Zeitzone als Parameter
-func Calc(coord GeoCoord, timezone MyTimeZone, year, month, day int) SunCal {
-	jd := MkJulianDate(year, month, day)
+// TODO function name
+// TODO use go date
+// TODO use go timezone?
+func SunCalc(coord GeoCoord, timezone MyTimeZone, year, month, day int) SunInfo {
+	jd := mkJulianDate(year, month, day)
 
-	var t float64 = (jd - jd2000) / 36525.0
-	const h float64 = -50.0 / 60.0 * rad // TODO buergerlich, astronomisch oder militaerisch
-	var lat float64 = coord.lat * rad
-	var lon float64 = coord.lon
+	t := (jd - jd2000) / 36525.0
+	const h = -50.0 / 60.0 * rad // TODO buergerlich, astronomisch oder militaerisch
+	lat := coord.lat * rad
+	lon := coord.lon
 
 	// Zeitzone := float64(timezone) // TODO TZ
 	tz := float64(timezone) // TODO TZ
 
-	var timeEqu, DK float64 = BerechneZeitgleichung(t) // TODO CalcTimeEquation
-	var timeDiff float64 = 12.0 * Acos((Sin(h)-Sin(lat)*Sin(DK))/(Cos(lat)*Cos(DK))) / Pi
-	var zoneTimeRise float64 = 12.0 - timeDiff - timeEqu
-	var zoneTimeDawn float64 = 12.0 + timeDiff - timeEqu
-	var worldTimeRise float64 = zoneTimeRise - lon/15.0
-	var worldTimeDawn float64 = zoneTimeDawn - lon/15.0
+	timeEqu, dk := berechneZeitgleichung(t) // TODO CalcTimeEquation
+	timeDiff := 12.0 * Acos((Sin(h)-Sin(lat)*Sin(dk))/(Cos(lat)*Cos(dk))) / Pi
+	zoneTimeRise := 12.0 - timeDiff - timeEqu
+	zoneTimeDawn := 12.0 + timeDiff - timeEqu
+	worldTimeRise := zoneTimeRise - lon/15.0
+	worldTimeDawn := zoneTimeDawn - lon/15.0
 	rise := applyTimezone(worldTimeRise, tz)
 	dawn := applyTimezone(worldTimeDawn, tz)
 	dtRise := floatTimeToDumbTime(rise)
@@ -169,15 +173,15 @@ func Calc(coord GeoCoord, timezone MyTimeZone, year, month, day int) SunCal {
 	fmt.Printf("Aufgang %d:%02d\n", dtRise.hour, dtRise.minute)
 	fmt.Printf("Untergang %d:%02d\n", dtDawn.hour, dtDawn.minute)
 
-	return SunCal{*dtRise, *dtDawn}
+	return SunInfo{*dtRise, *dtDawn}
 
 	// Vergleich mit CalSky.com
 	// Aufgang        :  7h18.4m Untergang      : 19h00.6m
 }
 
 func main() {
-	var c = GeoCoord{50.0, 10.0}
-	var r = Calc(c, MyNormalTime, 2005, 9, 30)
-	fmt.Printf("Aufgang %d:%02d\n", r.rise.hour, r.rise.minute)
-	fmt.Printf("Untergang %d:%02d\n", r.dawn.hour, r.dawn.minute)
+	coord := GeoCoord{50.0, 10.0}
+	sun := SunCalc(coord, MyNormalTime, 2005, 9, 30)
+	fmt.Printf("Aufgang %d:%02d\n", sun.rise.hour, sun.rise.minute)
+	fmt.Printf("Untergang %d:%02d\n", sun.set.hour, sun.set.minute)
 }
