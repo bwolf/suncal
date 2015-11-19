@@ -7,8 +7,8 @@ import (
 
 const (
 	pi2    = 2 * Pi
-	JD2000 = 2451545.0
-	RAD    = 0.017453292519943295769236907684886 // TODO replace with to_radians'!
+	jd2000 = 2451545.0
+	rad    = 0.017453292519943295769236907684886 // TODO replace with to_radians'!
 )
 
 type DumbTime struct {
@@ -63,48 +63,46 @@ func inPi(x float64) float64 {
 }
 
 // Neigung der Erdachse
-func Eps(T float64) float64 {
-	return RAD * (23.43929111 + (-46.8150*T-0.00059*T*T+0.001813*T*T*T)/3600.0)
+func Eps(t float64) float64 {
+	return rad * (23.43929111 + (-46.8150*t-0.00059*t*t+0.001813*t*t*t)/3600.0)
 }
 
 // TODO was ist DK?
 // TODO was ist T?
 // TODO Funktionsname
 // In German: Zeitgleichung
-func BerechneZeitgleichung(T float64) (float64, float64) {
-	var RA_Mittel float64 = 18.71506921 + 2400.0513369*T + (2.5862e-5-1.72e-9*T)*T*T
+func BerechneZeitgleichung(t float64) (float64, float64) {
+	var raMittel float64 = 18.71506921 + 2400.0513369*t + (2.5862e-5-1.72e-9*t)*t*t
 
-	var M float64 = inPi(pi2 * (0.993133 + 99.997361*T))
-	var L float64 = inPi(pi2 * (0.7859453 + M/pi2 +
-		(6893.0*Sin(M)+72.0*Sin(2.0*M)+6191.2*T)/1296.0e3))
+	var m float64 = inPi(pi2 * (0.993133 + 99.997361*t))
+	var l float64 = inPi(pi2 * (0.7859453 + m/pi2 +
+		(6893.0*Sin(m)+72.0*Sin(2.0*m)+6191.2*t)/1296.0e3))
 
-	var e float64 = Eps(T)
-	var RA float64 = Atan(Tan(L) * Cos(e))
+	var e float64 = Eps(t)
+	var ra float64 = Atan(Tan(l) * Cos(e))
 
-	if RA < 0.0 {
-		RA += Pi
+	if ra < 0.0 {
+		ra += Pi
+	}
+	if l > Pi {
+		ra += Pi
 	}
 
-	if L > Pi {
-		RA += Pi
-	}
-
-	RA = 24.0 * RA / pi2
-	DK := Asin(Sin(e) * Sin(L))
+	ra = 24.0 * ra / pi2
+	dk := Asin(Sin(e) * Sin(l))
 
 	// Damit 0 <= RA_Mittel < 24
-	RA_Mittel = 24.0 * inPi(pi2*RA_Mittel/24.0) / pi2
+	raMittel = 24.0 * inPi(pi2*raMittel/24.0) / pi2
 
-	var dRA float64 = RA_Mittel - RA
+	var dRA float64 = raMittel - ra
 	if dRA < -12.0 {
 		dRA += 24.0
-	}
-	if dRA > 12.0 {
+	} else if dRA > 12.0 {
 		dRA -= 24.0
 	}
 
 	dRA = dRA * 1.0027379
-	return dRA, DK
+	return dRA, dk
 }
 
 type MyTimeZone float64
@@ -146,12 +144,11 @@ func applyTimezone(worldTime, timezone float64) float64 {
 
 // TODO Zeitzone als Parameter
 func Calc(coord GeoCoord, timezone MyTimeZone, year, month, day int) SunCal {
-	const JD2000 float64 = 2451545.0
 	jd := MkJulianDate(year, month, day)
 
-	var t float64 = (jd - JD2000) / 36525.0
-	const h float64 = -50.0 / 60.0 * RAD // TODO buergerlich, astronomisch oder militaerisch
-	var lat float64 = coord.lat * RAD
+	var t float64 = (jd - jd2000) / 36525.0
+	const h float64 = -50.0 / 60.0 * rad // TODO buergerlich, astronomisch oder militaerisch
+	var lat float64 = coord.lat * rad
 	var lon float64 = coord.lon
 
 	// Zeitzone := float64(timezone) // TODO TZ
